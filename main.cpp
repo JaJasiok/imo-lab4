@@ -10,6 +10,7 @@
 #include <numeric>
 #include <variant>
 #include <chrono>
+#include <unistd.h>
 
 using namespace std;
 
@@ -443,8 +444,13 @@ vector<Graph> steepestLocalSearch(const vector<Graph> &startCycles, const vector
         {
             for (Vertex *vertex2 : cycles[1].vertices)
             {
-                Move *move = new Move({vertex1, vertex2}, {nullptr, nullptr}, nullptr, 0);
-                moves.push_back(move);
+                int delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
+
+                if (delta < 0)
+                {
+                    Move *move = new Move({vertex1, vertex2}, {nullptr, nullptr}, nullptr, delta);
+                    moves.push_back(move);
+                }
             }
         }
 
@@ -463,52 +469,25 @@ vector<Graph> steepestLocalSearch(const vector<Graph> &startCycles, const vector
 
                         if (vertex11->id != vertex12->id && vertex11->id != vertex21->id && vertex11->id != vertex22->id && vertex12->id != vertex21->id && vertex12->id != vertex22->id && vertex21->id != vertex22->id)
                         {
-                            Move *move = new Move({nullptr, nullptr}, {edge1, edge2}, &graph, 0);
-                            moves.push_back(move);
+                            int delta = distanceMatrix[vertex11->id][vertex21->id] + distanceMatrix[vertex12->id][vertex22->id] - edge1->distance - edge2->distance;
+                            if (delta < 0)
+                            {
+                                Move *move = new Move({nullptr, nullptr}, {edge1, edge2}, &graph, delta);
+                                moves.push_back(move);
+                            }
                         }
                     }
                 }
             }
         }
 
-        Move *bestMove = nullptr;
+        if(moves.size() > 0){
 
-        bestDelta = 0;
+            sort(moves.begin(), moves.end(), [](Move *a, Move *b)
+                { return a->delta < b->delta; });
 
-        for (auto move : moves)
-        {
-            int delta = 0;
+            Move *bestMove = moves[0];
 
-            if (move->graph == nullptr)
-            {
-                Vertex *vertex1 = move->vertices.first;
-                Vertex *vertex2 = move->vertices.second;
-
-                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
-            }
-            else
-            {
-                Edge *edge1 = move->edges.first;
-                Edge *edge2 = move->edges.second;
-                Graph *graphToSwap = move->graph;
-
-                Vertex *vertex11 = edge1->src;
-                Vertex *vertex12 = edge1->dest;
-                Vertex *vertex21 = edge2->src;
-                Vertex *vertex22 = edge2->dest;
-
-                delta = distanceMatrix[vertex11->id][vertex21->id] + distanceMatrix[vertex12->id][vertex22->id] - edge1->distance - edge2->distance;
-            }
-
-            if (delta < bestDelta)
-            {
-                bestMove = move;
-                bestDelta = delta;
-            }
-        }
-
-        if (bestDelta < 0)
-        {
             if (bestMove->graph == nullptr)
             {
                 Vertex *vertex1 = bestMove->vertices.first;
@@ -525,122 +504,18 @@ vector<Graph> steepestLocalSearch(const vector<Graph> &startCycles, const vector
 
                 swapEdgesInGraph(edge1, edge2, graphToSwap, distanceMatrix);
             }
+
+            for (Move* move : moves) {
+                delete move;
+            }
+            moves.clear();
+        }
+        else{
+            break;
         }
 
         i++;
-    } while (bestDelta < 0);
-
-    return cycles;
-}
-
-vector<Graph> steepestLocalSearchMaxIter(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int maxIter)
-{
-    vector<Graph> cycles;
-
-    for(Graph g: startCycles)
-    {
-        Graph newGraph(g);
-        cycles.push_back(Graph(g));
-    }
-
-    int bestDelta = 0;
-
-    int i = 0;
-
-    do
-    {
-        vector<Move *> moves;
-
-        for (Vertex *vertex1 : cycles[0].vertices)
-        {
-            for (Vertex *vertex2 : cycles[1].vertices)
-            {
-                Move *move = new Move({vertex1, vertex2}, {nullptr, nullptr}, nullptr, 0);
-                moves.push_back(move);
-            }
-        }
-
-        for (Graph &graph : cycles)
-        {
-            for (Edge *edge1 : graph.edges)
-            {
-                for (Edge *edge2 : graph.edges)
-                {
-                    if (edge1 != edge2)
-                    {
-                        Vertex *vertex11 = edge1->src;
-                        Vertex *vertex12 = edge1->dest;
-                        Vertex *vertex21 = edge2->src;
-                        Vertex *vertex22 = edge2->dest;
-
-                        if (vertex11->id != vertex12->id && vertex11->id != vertex21->id && vertex11->id != vertex22->id && vertex12->id != vertex21->id && vertex12->id != vertex22->id && vertex21->id != vertex22->id)
-                        {
-                            Move *move = new Move({nullptr, nullptr}, {edge1, edge2}, &graph, 0);
-                            moves.push_back(move);
-                        }
-                    }
-                }
-            }
-        }
-
-        Move *bestMove = nullptr;
-
-        bestDelta = 0;
-
-        for (auto move : moves)
-        {
-            int delta = 0;
-
-            if (move->graph == nullptr)
-            {
-                Vertex *vertex1 = move->vertices.first;
-                Vertex *vertex2 = move->vertices.second;
-
-                delta = distanceMatrix[vertex1->prev->id][vertex2->id] + distanceMatrix[vertex2->id][vertex1->next->id] + distanceMatrix[vertex2->prev->id][vertex1->id] + distanceMatrix[vertex1->id][vertex2->next->id] - distanceMatrix[vertex1->prev->id][vertex1->id] - distanceMatrix[vertex1->id][vertex1->next->id] - distanceMatrix[vertex2->prev->id][vertex2->id] - distanceMatrix[vertex2->id][vertex2->next->id];
-            }
-            else
-            {
-                Edge *edge1 = move->edges.first;
-                Edge *edge2 = move->edges.second;
-                Graph *graphToSwap = move->graph;
-
-                Vertex *vertex11 = edge1->src;
-                Vertex *vertex12 = edge1->dest;
-                Vertex *vertex21 = edge2->src;
-                Vertex *vertex22 = edge2->dest;
-
-                delta = distanceMatrix[vertex11->id][vertex21->id] + distanceMatrix[vertex12->id][vertex22->id] - edge1->distance - edge2->distance;
-            }
-
-            if (delta < bestDelta)
-            {
-                bestMove = move;
-                bestDelta = delta;
-            }
-        }
-
-        if (bestDelta < 0)
-        {
-            if (bestMove->graph == nullptr)
-            {
-                Vertex *vertex1 = bestMove->vertices.first;
-                Vertex *vertex2 = bestMove->vertices.second;
-
-                swapVerticesBetweenCycles(vertex1, vertex2, cycles, distanceMatrix);
-            }
-            else
-            {
-                Edge *edge1 = bestMove->edges.first;
-                Edge *edge2 = bestMove->edges.second;
-
-                Graph *graphToSwap = bestMove->graph;
-
-                swapEdgesInGraph(edge1, edge2, graphToSwap, distanceMatrix);
-            }
-        }
-
-        i++;
-    } while (i < maxIter);
+    } while (true);
 
     return cycles;
 }
@@ -650,30 +525,30 @@ vector<Graph> multipleLocalSearch(const vector<vector<int>> &distanceMatrix)
     vector<Graph> bestCycles;
     int bestDistance = INT_MAX;
 
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 100; i++)
     {
         vector<Graph> cycles = randomCycles(distanceMatrix);
 
-        cycles = steepestLocalSearchMaxIter(cycles, distanceMatrix, 100);
+        cycles = steepestLocalSearch(cycles, distanceMatrix);
 
-        int newDistance = 0;
-
-        for (Graph g : cycles)
-        {
-            newDistance += g.distance;
-        }
+        int newDistance = cycles[0].distance + cycles[1].distance;
 
         if (newDistance < bestDistance)
         {
             bestDistance = newDistance;
-            bestCycles = cycles;
+            bestCycles.clear();
+            for(Graph g: cycles)
+            {
+                Graph newGraph(g);
+                bestCycles.push_back(Graph(g));
+            }
         }
     }
 
     return bestCycles;
 }
 
-vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix)
+vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
 {
     vector<Graph> bestCycles;
 
@@ -685,8 +560,11 @@ vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector
 
     bestCycles = steepestLocalSearch(bestCycles, distanceMatrix);
 
-    
     int a = 0;
+
+    int elapsed;
+
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
     do{
         vector<Graph> newCycles;
@@ -697,7 +575,10 @@ vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector
             newCycles.push_back(Graph(g));
         }
 
-        for(int i = 0; i < 10; i ++){
+        // Distance: 34139 - 10
+        // Distance: 33079 - 20
+
+        for(int i = 0; i < 15; i ++){
 
             vector<Move *> moves;
 
@@ -751,20 +632,36 @@ vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector
 
                 swapEdgesInGraph(edge1, edge2, graphToSwap, distanceMatrix);
             }
+
+            for (Move* move : moves) {
+                delete move;
+            }
+            moves.clear();
         }
 
         newCycles = steepestLocalSearch(newCycles, distanceMatrix);
 
         if(newCycles[0].distance + newCycles[1].distance < bestCycles[0].distance + bestCycles[1].distance)
         {
-            bestCycles = newCycles;
+            bestCycles.clear();
+            for(Graph g: newCycles)
+            {
+                Graph newGraph(g);
+                bestCycles.push_back(Graph(g));
+            }
         }
 
         a++;
 
-        // cout << a << endl;
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-    } while(a < 30);
+        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+
+        cout << a << endl;
+
+    } while(elapsed < timeLimit);
+
+    cout << elapsed << endl;
 
     return bestCycles;
 }
@@ -780,11 +677,22 @@ int main()
 
     vector<Graph> startCycles = randomCycles(distanceMatrix);
 
-    vector<Graph> multi = multipleLocalSearch(distanceMatrix);
+    // chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
-    cout << "Distance: " << multi[0].distance + multi[1].distance << endl;
+    // vector<Graph> multi = multipleLocalSearch(distanceMatrix);
 
-    vector<Graph> iterated = iteratedLocalSearch(startCycles, distanceMatrix);
+    // chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+    // int elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+
+    // cout << elapsed << endl;
+
+    // cout << "Distance: " << multi[0].distance + multi[1].distance << endl;
+
+    // 67199
+    // Distance: 35976
+
+    vector<Graph> iterated = iteratedLocalSearch(startCycles, distanceMatrix, 67199);
 
     cout << "Distance: " << iterated[0].distance + iterated[1].distance << endl;
 
