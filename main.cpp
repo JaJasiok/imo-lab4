@@ -183,7 +183,7 @@ public:
                 {
                     this->distance -= e->distance;
                     edges.erase(remove(edges.begin(), edges.end(), e), edges.end());
-                    // e->remove();
+                    delete e;
                     break;
                 }
             }
@@ -233,6 +233,26 @@ public:
         } while (currentVertex != end);
 
         return path;
+    }
+
+    void destroy(Vertex *start, int n, const vector<vector<int>> &distanceMatrix){
+        Vertex *currentVertex = start;
+        for(int i = 0; i < n/2; i++){
+            currentVertex = currentVertex->prev;
+        }
+        Vertex *startPrev = currentVertex->prev;
+        for(int i = 0; i < n; i++){
+            Vertex *next = currentVertex->next;
+
+            removeVertex(currentVertex);
+            currentVertex = next;
+            if(i == n - 1){
+                addEdge(startPrev, currentVertex, distanceMatrix[startPrev->id][currentVertex->id]);
+            }
+            // if(i != 0){
+            //     delete currentVertex->prev;
+            // }
+        }
     }
 };
 
@@ -421,6 +441,89 @@ void swapVerticesInCycle(Vertex *vertex1, Vertex *vertex2, Graph *graph, const v
     graph->addEdge(vertex1, vertex2Next, distanceMatrix[vertex1->id][vertex2Next->id]);
 }
 
+void repair(vector<Graph>& cycles, const vector<vector<int>> &distanceMatrix)
+{
+    int numVertices = distanceMatrix.size();
+    vector<bool> visited(numVertices, false);
+
+    for (Graph &cycle : cycles)
+    {
+        for (Vertex *v : cycle.vertices)
+        {
+            visited[v->id] = true;
+        }
+    }
+
+    do
+    {
+        int minDistance = INT_MAX;
+        int vertexId = -1;
+        pair<Edge *, Graph *> minPair;
+
+        vector<pair<Edge *, Graph *>> edgesInGraphs;
+        if (cycles[0].vertices.size() == numVertices / 2)
+        {
+            for (Edge *e : cycles[1].edges)
+            {
+                edgesInGraphs.push_back({e, &cycles[1]});
+            }
+        }
+        else if (cycles[1].vertices.size() == numVertices / 2)
+        {
+            for (Edge *e : cycles[0].edges)
+            {
+                edgesInGraphs.push_back({e, &cycles[0]});
+            }
+        }
+        else
+        {
+            for (Graph &cycle : cycles)
+            {
+                for (Edge *e : cycle.edges)
+                {
+                    edgesInGraphs.push_back({e, &cycle});
+                }
+            }
+        }
+
+        for (int j = 0; j < numVertices; j++)
+        {
+            if (!visited[j])
+            {
+                for (pair<Edge *, Graph *> singlePair : edgesInGraphs)
+                {
+                    Edge *e = singlePair.first;
+                    int distanceSum = cycles[0].distance + cycles[1].distance;
+                    if (distanceSum - e->distance + distanceMatrix[e->dest->id][j] + distanceMatrix[e->src->id][j] < minDistance)
+                    {
+                        minDistance = distanceSum - e->distance + distanceMatrix[e->dest->id][j] + distanceMatrix[e->src->id][j];
+                        vertexId = j;
+                        minPair = singlePair;
+                    }
+                }
+            }
+        }
+
+        Graph *cyclePtr = minPair.second;
+        Graph &cycle = *cyclePtr;
+
+        Edge *minEdge = minPair.first;
+
+        Vertex *newVertex = new Vertex(vertexId);
+
+        cycle.addVertex(newVertex);
+        cycle.addEdge(minEdge->src, newVertex, distanceMatrix[minEdge->src->id][vertexId]);
+        cycle.addEdge(newVertex, minEdge->dest, distanceMatrix[newVertex->id][minEdge->dest->id]);
+
+        if (cycle.vertices.size() > 3)
+        {
+            cycle.removeEdge(minEdge->src, minEdge->dest);
+        }
+
+        visited[vertexId] = true;
+    }while(cycles[0].vertices.size() < numVertices / 2 || cycles[1].vertices.size() < numVertices / 2);
+}
+
 vector<Graph> steepestLocalSearch(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix)
 {
     vector<Graph> cycles;
@@ -548,7 +651,7 @@ vector<Graph> multipleLocalSearch(const vector<vector<int>> &distanceMatrix)
     return bestCycles;
 }
 
-vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+vector<Graph> iteratedLocalSearch1(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
 {
     vector<Graph> bestCycles;
 
@@ -576,6 +679,7 @@ vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector
         }
 
         // Distance: 34139 - 10
+        // Distance: 32975 - 15
         // Distance: 33079 - 20
 
         for(int i = 0; i < 15; i ++){
@@ -656,16 +760,156 @@ vector<Graph> iteratedLocalSearch(const vector<Graph> &startCycles, const vector
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
         elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
-
-        cout << a << endl;
-
     } while(elapsed < timeLimit);
 
-    cout << elapsed << endl;
+    cout << a << endl;
 
     return bestCycles;
 }
 
+vector<Graph> iteratedLocalSearch2a(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+{
+    vector<Graph> bestCycles;
+
+    for(Graph g: startCycles)
+    {
+        Graph newGraph(g);
+        bestCycles.push_back(Graph(g));
+    }
+
+    int a = 0;
+
+    int elapsed;
+
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+
+    bestCycles = steepestLocalSearch(bestCycles, distanceMatrix);
+
+    do{
+        vector<Graph> newCycles;
+
+        for(Graph g: bestCycles)
+        {
+            Graph newGraph(g);
+            newCycles.push_back(Graph(g));
+        }
+
+        // int minDistance = INT_MAX;
+
+        // Vertex *nearestVertex1 = nullptr;
+        // Vertex *nearestVertex2 = nullptr;
+
+        // for(Vertex *vertex1: newCycles[0].vertices)
+        // {
+        //     for(Vertex *vertex2: newCycles[1].vertices)
+        //     {
+        //         if(distanceMatrix[vertex1->id][vertex2->id] < minDistance)
+        //         {
+        //             minDistance = distanceMatrix[vertex1->id][vertex2->id];
+        //             nearestVertex1 = vertex1;
+        //             nearestVertex2 = vertex2;
+        //         }
+        //     }
+        // }
+
+        newCycles[0].destroy(newCycles[0].vertices[rand() % newCycles[0].vertices.size()], 30, distanceMatrix);
+        newCycles[1].destroy(newCycles[1].vertices[rand() % newCycles[1].vertices.size()], 30, distanceMatrix);
+
+        repair(newCycles, distanceMatrix);
+
+        if(newCycles[0].distance + newCycles[1].distance < bestCycles[0].distance + bestCycles[1].distance)
+        {
+            bestCycles.clear();
+            for(Graph g: newCycles)
+            {
+                Graph newGraph(g);
+                bestCycles.push_back(Graph(g));
+            }
+        }
+
+        a++;
+
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+    } while(elapsed < timeLimit);
+
+    cout << a << endl;
+
+    return bestCycles;
+}
+
+vector<Graph> iteratedLocalSearch2b(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+{
+    vector<Graph> bestCycles;
+
+    for(Graph g: startCycles)
+    {
+        Graph newGraph(g);
+        bestCycles.push_back(Graph(g));
+    }
+
+    int a = 0;
+
+    int elapsed;
+
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+
+    do{
+        vector<Graph> newCycles;
+
+        for(Graph g: bestCycles)
+        {
+            Graph newGraph(g);
+            newCycles.push_back(Graph(g));
+        }
+
+        newCycles = steepestLocalSearch(newCycles, distanceMatrix);
+
+        // int minDistance = INT_MAX;
+
+        // Vertex *nearestVertex1 = nullptr;
+        // Vertex *nearestVertex2 = nullptr;
+
+        // for(Vertex *vertex1: newCycles[0].vertices)
+        // {
+        //     for(Vertex *vertex2: newCycles[1].vertices)
+        //     {
+        //         if(distanceMatrix[vertex1->id][vertex2->id] < minDistance)
+        //         {
+        //             minDistance = distanceMatrix[vertex1->id][vertex2->id];
+        //             nearestVertex1 = vertex1;
+        //             nearestVertex2 = vertex2;
+        //         }
+        //     }
+        // }
+
+        newCycles[0].destroy(newCycles[0].vertices[rand() % newCycles[0].vertices.size()], 30, distanceMatrix);
+        newCycles[1].destroy(newCycles[1].vertices[rand() % newCycles[1].vertices.size()], 30, distanceMatrix);
+
+        repair(newCycles, distanceMatrix);
+
+        if(newCycles[0].distance + newCycles[1].distance < bestCycles[0].distance + bestCycles[1].distance)
+        {
+            bestCycles.clear();
+            for(Graph g: newCycles)
+            {
+                Graph newGraph(g);
+                bestCycles.push_back(Graph(g));
+            }
+        }
+
+        a++;
+
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+    } while(elapsed < timeLimit);
+
+    cout << a << endl;
+
+    return bestCycles;
+}
 
 int main()
 {
@@ -677,24 +921,29 @@ int main()
 
     vector<Graph> startCycles = randomCycles(distanceMatrix);
 
-    // chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
 
-    // vector<Graph> multi = multipleLocalSearch(distanceMatrix);
+    vector<Graph> multi = multipleLocalSearch(distanceMatrix);
 
-    // chrono::steady_clock::time_point end = chrono::steady_clock::now();
+    chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-    // int elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+    int elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
 
-    // cout << elapsed << endl;
+    cout << elapsed << endl;
 
-    // cout << "Distance: " << multi[0].distance + multi[1].distance << endl;
+    cout << "Distance: " << multi[0].distance + multi[1].distance << endl;
 
-    // 67199
-    // Distance: 35976
+    vector<Graph> iterated1 = iteratedLocalSearch1(startCycles, distanceMatrix, elapsed);
 
-    vector<Graph> iterated = iteratedLocalSearch(startCycles, distanceMatrix, 67199);
+    cout << "Distance: " << iterated1[0].distance + iterated1[1].distance << endl;
 
-    cout << "Distance: " << iterated[0].distance + iterated[1].distance << endl;
+    vector<Graph> iterated2a = iteratedLocalSearch2a(startCycles, distanceMatrix, elapsed);
+
+    cout << "Distance: " << iterated2a[0].distance + iterated2a[1].distance << endl;
+
+    vector<Graph> iterated2b = iteratedLocalSearch2b(startCycles, distanceMatrix, elapsed);
+
+    cout << "Distance: " << iterated2b[0].distance + iterated2b[1].distance << endl;
 
     return 0;
 }
