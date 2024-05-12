@@ -651,15 +651,9 @@ vector<Graph> multipleLocalSearch(const vector<vector<int>> &distanceMatrix)
     return bestCycles;
 }
 
-vector<Graph> iteratedLocalSearch1(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+vector<Graph> iteratedLocalSearch1(const vector<vector<int>> &distanceMatrix, int timeLimit)
 {
-    vector<Graph> bestCycles;
-
-    for(Graph g: startCycles)
-    {
-        Graph newGraph(g);
-        bestCycles.push_back(Graph(g));
-    }
+    vector<Graph> bestCycles = randomCycles(distanceMatrix);
 
     bestCycles = steepestLocalSearch(bestCycles, distanceMatrix);
 
@@ -759,7 +753,7 @@ vector<Graph> iteratedLocalSearch1(const vector<Graph> &startCycles, const vecto
 
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+        elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
     } while(elapsed < timeLimit);
 
     cout << a << endl;
@@ -767,15 +761,9 @@ vector<Graph> iteratedLocalSearch1(const vector<Graph> &startCycles, const vecto
     return bestCycles;
 }
 
-vector<Graph> iteratedLocalSearch2a(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+vector<Graph> iteratedLocalSearch2a(const vector<vector<int>> &distanceMatrix, int timeLimit)
 {
-    vector<Graph> bestCycles;
-
-    for(Graph g: startCycles)
-    {
-        Graph newGraph(g);
-        bestCycles.push_back(Graph(g));
-    }
+    vector<Graph> bestCycles = randomCycles(distanceMatrix);
 
     int a = 0;
 
@@ -831,7 +819,7 @@ vector<Graph> iteratedLocalSearch2a(const vector<Graph> &startCycles, const vect
 
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+        elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
     } while(elapsed < timeLimit);
 
     cout << a << endl;
@@ -839,15 +827,9 @@ vector<Graph> iteratedLocalSearch2a(const vector<Graph> &startCycles, const vect
     return bestCycles;
 }
 
-vector<Graph> iteratedLocalSearch2b(const vector<Graph> &startCycles, const vector<vector<int>> &distanceMatrix, int timeLimit)
+vector<Graph> iteratedLocalSearch2b(const vector<vector<int>> &distanceMatrix, int timeLimit)
 {
-    vector<Graph> bestCycles;
-
-    for(Graph g: startCycles)
-    {
-        Graph newGraph(g);
-        bestCycles.push_back(Graph(g));
-    }
+    vector<Graph> bestCycles = randomCycles(distanceMatrix);
 
     int a = 0;
 
@@ -903,7 +885,7 @@ vector<Graph> iteratedLocalSearch2b(const vector<Graph> &startCycles, const vect
 
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-        elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+        elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
     } while(elapsed < timeLimit);
 
     cout << a << endl;
@@ -915,35 +897,255 @@ int main()
 {
     // srand(time(0));
 
-    vector<vector<int>> verticesCoords = readKroaFile("kroA200.tsp");
+    vector<vector<int>> verticesCoords = readKroaFile("kroB200.tsp");
 
     vector<vector<int>> distanceMatrix = createDistanceMatrix(verticesCoords);
 
-    vector<Graph> startCycles = randomCycles(distanceMatrix);
+    vector<Graph> bestMulti;
+    int bestMultiDistance = INT_MAX;
+    int worstMultiDistance = 0;
+    int avgMultiDistance = 0;
 
-    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+    int bestMultiTime = INT_MAX;
+    int worstMultiTime = 0;
+    int avgMutliTime = 0;
 
-    vector<Graph> multi = multipleLocalSearch(distanceMatrix);
+    for(int i = 0; i < 10; i++)
+    {
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+        vector<Graph> multi = multipleLocalSearch(distanceMatrix);
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
 
-    chrono::steady_clock::time_point end = chrono::steady_clock::now();
+        int elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
 
-    int elapsed = chrono::duration_cast<chrono::milliseconds>(end - begin).count();
+        if(multi[0].distance + multi[1].distance < bestMultiDistance)
+        {
+            bestMultiDistance = multi[0].distance + multi[1].distance;
+            bestMulti.clear();
+            for(Graph g: multi)
+            {
+                Graph newGraph(g);
+                bestMulti.push_back(Graph(g));
+            }
+        }
+        if (multi[0].distance + multi[1].distance > worstMultiDistance)
+        {
+            worstMultiDistance = multi[0].distance + multi[1].distance;
+        }
+        avgMultiDistance += multi[0].distance + multi[1].distance;
 
-    cout << elapsed << endl;
 
-    cout << "Distance: " << multi[0].distance + multi[1].distance << endl;
+        if(elapsed < bestMultiTime)
+        {
+            bestMultiTime = elapsed;
+        }
+        if(elapsed > worstMultiTime)
+        {
+            worstMultiTime = elapsed;
+        }
+        avgMutliTime += elapsed;
+    }
+    
+    int avgTime = avgMutliTime / 10;
+    int maxTime = avgTime;
 
-    vector<Graph> iterated1 = iteratedLocalSearch1(startCycles, distanceMatrix, elapsed);
+    avgMultiDistance /= 10;
 
-    cout << "Distance: " << iterated1[0].distance + iterated1[1].distance << endl;
+    cout << "Multiple local search:" << endl;
+    cout << "Best distance: " << bestMultiDistance << endl;
+    cout << "Worst distance: " << worstMultiDistance << endl;
+    cout << "Average distance: " << avgMultiDistance << endl;
 
-    vector<Graph> iterated2a = iteratedLocalSearch2a(startCycles, distanceMatrix, elapsed);
+    cout << "Best time: " << bestMultiTime << endl;
+    cout << "Worst time: " << worstMultiTime << endl;
+    cout << "Average time: " << avgTime << endl;
 
-    cout << "Distance: " << iterated2a[0].distance + iterated2a[1].distance << endl;
+    saveGraphs(bestMulti, "multiB.txt");
 
-    vector<Graph> iterated2b = iteratedLocalSearch2b(startCycles, distanceMatrix, elapsed);
 
-    cout << "Distance: " << iterated2b[0].distance + iterated2b[1].distance << endl;
+
+    vector<Graph> bestIterated1;
+    int bestIterated1Distance = INT_MAX;
+    int worstIterated1Distance = 0;
+    int avgIterated1Distance = 0;
+
+    int bestIterated1Time = INT_MAX;
+    int worstIterated1Time = 0;
+    int avgIterated1Time = 0;
+
+    for(int i = 0; i < 10; i++)
+    {
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+        vector<Graph> iterated1 = iteratedLocalSearch1(distanceMatrix, maxTime);
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+        int elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
+
+        if(iterated1[0].distance + iterated1[1].distance < bestIterated1Distance)
+        {
+            bestIterated1Distance = iterated1[0].distance + iterated1[1].distance;
+            bestIterated1.clear();
+            for(Graph g: iterated1)
+            {
+                Graph newGraph(g);
+                bestIterated1.push_back(Graph(g));
+            }
+        }
+        if (iterated1[0].distance + iterated1[1].distance > worstIterated1Distance)
+        {
+            worstIterated1Distance = iterated1[0].distance + iterated1[1].distance;
+        }
+        avgIterated1Distance += iterated1[0].distance + iterated1[1].distance;
+        
+
+        if(elapsed < bestIterated1Time)
+        {
+            bestIterated1Time = elapsed;
+        }
+        if(elapsed > worstIterated1Time)
+        {
+            worstIterated1Time = elapsed;
+        }
+        avgIterated1Time += elapsed;
+    }
+
+    avgIterated1Time /= 10;
+
+    avgIterated1Distance /= 10;
+
+
+    cout << "Iterated local search 1:" << endl;
+    cout << "Best distance: " << bestIterated1Distance << endl;
+    cout << "Worst distance: " << worstIterated1Distance << endl;
+    cout << "Average distance: " << avgIterated1Distance << endl;
+    
+    cout << "Best time: " << bestIterated1Time << endl;
+    cout << "Worst time: " << worstIterated1Time << endl;
+    cout << "Average time: " << avgIterated1Time << endl;
+
+    saveGraphs(bestIterated1, "iterated1B.txt");
+
+
+
+    vector<Graph> bestIterated2a;
+    int bestIterated2aDistance = INT_MAX;
+    int worstIterated2aDistance = 0;
+    int avgIterated2aDistance = 0;
+
+    int bestIterated2aTime = INT_MAX;
+    int worstIterated2aTime = 0;
+    int avgIterated2aTime = 0;
+
+    for(int i = 0; i < 10; i++)
+    {
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+        vector<Graph> iterated2a = iteratedLocalSearch2a(distanceMatrix, maxTime);
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+        int elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
+
+        if(iterated2a[0].distance + iterated2a[1].distance < bestIterated2aDistance)
+        {
+            bestIterated2aDistance = iterated2a[0].distance + iterated2a[1].distance;
+            bestIterated2a.clear();
+            for(Graph g: iterated2a)
+            {
+                Graph newGraph(g);
+                bestIterated2a.push_back(Graph(g));
+            }
+        }
+        if (iterated2a[0].distance + iterated2a[1].distance > worstIterated2aDistance)
+        {
+            worstIterated2aDistance = iterated2a[0].distance + iterated2a[1].distance;
+        }
+        avgIterated2aDistance += iterated2a[0].distance + iterated2a[1].distance;
+
+        if(elapsed < bestIterated2aTime)
+        {
+            bestIterated2aTime = elapsed;
+        }
+        if(elapsed > worstIterated2aTime)
+        {
+            worstIterated2aTime = elapsed;
+        }
+        avgIterated2aTime += elapsed;
+    }
+
+    avgIterated2aTime /= 10;
+
+    avgIterated2aDistance /= 10;
+
+    cout << "Iterated local search 2a:" << endl;
+    cout << "Best distance: " << bestIterated2aDistance << endl;
+    cout << "Worst distance: " << worstIterated2aDistance << endl;
+    cout << "Average distance: " << avgIterated2aDistance << endl;
+
+    cout << "Best time: " << bestIterated2aTime << endl;
+    cout << "Worst time: " << worstIterated2aTime << endl;
+    cout << "Average time: " << avgIterated2aTime << endl;
+
+    saveGraphs(bestIterated2a, "iterated2aB.txt");
+
+
+
+    vector<Graph> bestIterated2b;
+    int bestIterated2bDistance = INT_MAX;
+    int worstIterated2bDistance = 0;
+    int avgIterated2bDistance = 0;
+
+    int bestIterated2bTime = INT_MAX;
+    int worstIterated2bTime = 0;
+    int avgIterated2bTime = 0;
+
+    for(int i = 0; i < 10; i++)
+    {
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+        vector<Graph> iterated2b = iteratedLocalSearch2b(distanceMatrix, maxTime);
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+
+        int elapsed = chrono::duration_cast<chrono::seconds>(end - begin).count();
+
+        if(iterated2b[0].distance + iterated2b[1].distance < bestIterated2bDistance)
+        {
+            bestIterated2bDistance = iterated2b[0].distance + iterated2b[1].distance;
+            bestIterated2b.clear();
+            for(Graph g: iterated2b)
+            {
+                Graph newGraph(g);
+                bestIterated2b.push_back(Graph(g));
+            }
+        }
+        if (iterated2b[0].distance + iterated2b[1].distance > worstIterated2bDistance)
+        {
+            worstIterated2bDistance = iterated2b[0].distance + iterated2b[1].distance;
+        }
+        avgIterated2bDistance += iterated2b[0].distance + iterated2b[1].distance;
+
+        if(elapsed < bestIterated2bTime)
+        {
+            bestIterated2bTime = elapsed;
+        }
+        if(elapsed > worstIterated2bTime)
+        {
+            worstIterated2bTime = elapsed;
+        }
+        avgIterated2bTime += elapsed;
+    }
+
+    avgIterated2bTime /= 10;
+
+    avgIterated2bDistance /= 10;
+
+    cout << "Iterated local search 2b:" << endl;
+    cout << "Best distance: " << bestIterated2bDistance << endl;
+    cout << "Worst distance: " << worstIterated2bDistance << endl;
+    cout << "Average distance: " << avgIterated2bDistance << endl;
+
+    cout << "Best time: " << bestIterated2bTime << endl;
+    cout << "Worst time: " << worstIterated2bTime << endl;
+    cout << "Average time: " << avgIterated2bTime << endl;
+
+    saveGraphs(bestIterated2b, "iterated2bB.txt");
 
     return 0;
 }
